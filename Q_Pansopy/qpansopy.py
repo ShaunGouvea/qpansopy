@@ -11,6 +11,7 @@ from qgis.core import QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry, QgsCo
 # Import the dock widgets
 from .qpansopy_vss_dockwidget import QPANSOPYVSSDockWidget
 from .qpansopy_ils_dockwidget import QPANSOPYILSDockWidget
+from .qpansopy_non_precision_final_app_dockwidget import QPANSOPYNpFinAppDockWidget
 
 class Qpansopy:
     """QPANSOPY Plugin Implementation"""
@@ -57,7 +58,8 @@ class Qpansopy:
 
         #Configure Modules NAME:PROPERTIES (STR:DICT)
         self.modules:dict = {"VSS": {"TITLE":"QPANSOPY VSS Tool","ICON":"vss_icon.png","DOCK_WIDGET": QPANSOPYVSSDockWidget,"GUI_INSTANCE":None},
-                             "ILS": {"TITLE":"QPANSOPY ILS Tool","ICON":"ils_icon.png","DOCK_WIDGET": QPANSOPYILSDockWidget,"GUI_INSTANCE":None}}
+                             "ILS": {"TITLE":"QPANSOPY ILS Tool","ICON":"ils_icon.png","DOCK_WIDGET": QPANSOPYILSDockWidget,"GUI_INSTANCE":None},
+                             "NPFA": {"TITLE":"QPANSOPY Non-precision Final App Tool","ICON":"NP_FinalApp_icon.png","DOCK_WIDGET": QPANSOPYNpFinAppDockWidget,"GUI_INSTANCE":None}}
 
         #Create Actions
         for name,properties in self.modules.items():
