@@ -221,15 +221,13 @@ class QPANSOPYNpFinAppDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         try:
             # Run calculation based on Navaid type
-            if navaid_type == "NDB" or navaid_type == "VOR":
+            if navaid_type == "NDB" or navaid_type == "VOR" or navaid_type == "DF":
                 self.log("Running {} splay calculation...".format(navaid_type))
                 # Import here to avoid circular imports
                 from .modules.np_final_app import calculate_np_final_approach
                 result = calculate_np_final_approach(self.iface, thr_layer,navaid_layer, runway_layer, params,self.log)
             elif navaid_type == "LOC":
                 iface.messageBar().pushMessage("Error", "LOC not yet implimented", level=Qgis.Critical)
-            elif navaid_type == "DF":
-                iface.messageBar().pushMessage("Error", "DF not yet implimented", level=Qgis.Critical)
             elif navaid_type == "PSR":
                 iface.messageBar().pushMessage("Error", "PSR not yet implimented", level=Qgis.Critical)
             else:

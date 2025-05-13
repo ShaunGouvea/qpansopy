@@ -213,7 +213,8 @@ class QPANSOPYUnit:
             elif unit in QPANSOPYUnitType.distance_units and last_unit in QPANSOPYUnitType.distance_units or \
             unit in QPANSOPYUnitType.speed_units and last_unit in QPANSOPYUnitType.speed_units or \
             unit in QPANSOPYUnitType.time_units and last_unit in QPANSOPYUnitType.time_units or \
-            unit in QPANSOPYUnitType.temperature_units and last_unit in QPANSOPYUnitType.temperature_units:
+            unit in QPANSOPYUnitType.temperature_units and last_unit in QPANSOPYUnitType.temperature_units or \
+            unit in QPANSOPYUnitType.angle_units and last_unit in QPANSOPYUnitType.angle_units:
                 next
             else:
                 same_units = False
@@ -378,6 +379,7 @@ class QPANSOPYUnit:
 
     @classmethod
     def convert_unit(cls,quantity:float,current_units:QPANSOPYUnitType,requested_units:QPANSOPYUnitType) -> float:
+        ##TODO This doesnt work with angles
         if current_units in QPANSOPYUnitType.speed_units and requested_units in QPANSOPYUnitType.speed_units:
             return quantity * cls._speed_conversion[current_units][requested_units]
         if current_units in QPANSOPYUnitType.distance_units and requested_units in QPANSOPYUnitType.distance_units:
@@ -421,11 +423,12 @@ class QPANSOPYUnit:
         :return QPANSOPYUnit: new instance of QPANSOPYUnit is returned
         """
         if type(other) is QPANSOPYUnit:
+                print("Units are the same: ",self.same_unit_category(self.unit,other.unit))
                 if self.same_unit_category(self.unit,other.unit):
                     new_quantity = self.quantity - self.convert_unit(other.quantity,other.unit,self.unit)
                     return QPANSOPYUnit(new_quantity,self.unit)
                 else:
-                    raise TypeError("Cannot subtract {} from {}".format(type(self.unit,type(other.unit))))
+                    raise TypeError(f"Cannot subtract {self.unit.name} from {other.unit.name}")
         elif type(other) is float or type(other) is int:
             return QPANSOPYUnit(self.quantity - other,self.unit)
         else:
@@ -542,4 +545,3 @@ QPANSOPYUnitType._unit_category = {\
 
 #Inverted Dictionary for reverse lookup
 QPANSOPYUnitType._category_lookup = {unit: category for category in QPANSOPYUnitType._unit_category for unit in QPANSOPYUnitType._unit_category[category]}
-    

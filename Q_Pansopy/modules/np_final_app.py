@@ -3,7 +3,7 @@ from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry, 
     QgsCoordinateReferenceSystem, QgsCoordinateTransform,
     QgsPointXY, QgsWkbTypes, QgsField, QgsFields, QgsPoint,
-    QgsLineString, QgsPolygon, QgsVectorFileWriter
+    QgsLineString, QgsPolygon, QgsVectorFileWriter, QgsCircularString, QgsCompoundCurve, QgsCurvePolygon
 )
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
@@ -17,7 +17,8 @@ import datetime
 
 
 navaid_parameters = {"NDB": {"area_tolerance_nm":1.25,"area_splay_deg":10.3,"tracking_tolerance_deg":6.9,"fix_tolerance_deg":6.2},
-                     "VOR": {"area_tolerance_nm":1.0,"area_splay_deg":7.8,"tracking_tolerance_deg":5.2,"fix_tolerance_deg":4.5}}
+                     "VOR": {"area_tolerance_nm":1.0,"area_splay_deg":7.8,"tracking_tolerance_deg":5.2,"fix_tolerance_deg":4.5},
+                     "DF": {"area_tolerance_nm":3.0,"area_splay_deg":10}}
 
 
 # Function to convert from PointXY and add Z value
@@ -92,8 +93,34 @@ def draw_vor_ndb(provider: QgsVectorLayer,azimuth:float,thr_geom,thr_elev:QPANSO
 def draw_loc():
     pass
 
-def draw_df():
-    pass
+def draw_df(provider,log ,azimuth,length:QPANSOPYUnit,thr_elev:QPANSOPYUnit,navaid_geom,thr_geom):
+    area_tolerance = QPANSOPYUnit(navaid_parameters["DF"]["area_tolerance_nm"],QPANSOPYUnitType.NAUTICAL_MILE)
+    area_splay = QPANSOPYUnit(navaid_parameters["DF"]["area_splay_deg"],QPANSOPYUnitType.DEGREES)
+    inverse_splay = QPANSOPYUnit(90 - area_splay.degrees,QPANSOPYUnitType.DEGREES)
+    och = QPANSOPYUnit(250,QPANSOPYUnitType.FEET)
+    moc = QPANSOPYUnit(90,QPANSOPYUnitType.METRE)
+    primary_alt = och.metres - moc.metres + thr_elev.metres
+    splay_line_length = (area_tolerance.metres / 2) * math.cos(inverse_splay.radians) + math.sqrt(length.metres**2 - (area_tolerance.metres / 2)**2 * math.sin(inverse_splay.radians)**2)
+    pnt_p1 = navaid_geom.project(area_tolerance.metres / 2,azimuth +90)
+    pnt_p2 = navaid_geom.project(area_tolerance.metres / 2,azimuth -90)
+    pnt_p3 = pnt_p1.project(splay_line_length,azimuth +10)
+    pnt_p4 = pnt_p2.project(splay_line_length,azimuth -10)
+    pnt_p5 = navaid_geom.project(length.metres,azimuth)
+    circular_string = QgsCircularString()
+    circular_string.setPoints([pz(pnt_p3,primary_alt),pz(pnt_p5,primary_alt),pz(pnt_p4,primary_alt)])
+    line = QgsLineString([pz(pnt_p4,thr_elev.metres),pz(pnt_p2,thr_elev.metres),pz(pnt_p1,thr_elev.metres),pz(pnt_p3,thr_elev.metres)])
+    #   Primary Area
+    compound = QgsCompoundCurve()
+    compound.addCurve(circular_string)
+    compound.addCurve(line)
+    poly = QgsCurvePolygon()
+    poly.setExteriorRing(compound)
+    feature = QgsFeature()
+    geometry = QgsGeometry(poly)
+    feature.setGeometry(geometry)
+    feature.setAttributes(['primary area'])
+    provider.addFeatures([feature])
+
 
 def draw_sre():
     pass
@@ -114,10 +141,6 @@ def draw_track_tolerance(provider:QgsVectorLayer,tolerance_angle:QPANSOPYUnit,na
     feature.setAttributes(['Tracking Tolerance'])
     provider.addFeatures([feature])
 
-
-
-
-    
 
 def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_layer, params,log) -> dict:
     """
@@ -200,7 +223,7 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
     log(f"Maximum offset angle for this approach is: {abs(math.floor(max_offset*10000)/10000)}° {direction}")
     
     ##Calculate the direction to draw the final approach track
-    if FAT_direction.startswith("TO"):
+    if FAT_direction.startswith("TO") or navaid_type == "DF":
         track_azimuth = (runway_back_azimuth + offset_angle.degrees) % 360
     elif FAT_direction.startswith("FROM"):
         track_azimuth = (runway_back_azimuth + offset_angle.degrees - 180) % 360
@@ -211,9 +234,16 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
 
 
     # Create memory layer
-    v_layer = QgsVectorLayer("PolygonZ?crs=" + map_srid, "{}_Final_Approach_Surfaces".format(navaid_type), "memory")
+    if navaid_type == "DF":
+        v_layer = QgsVectorLayer("CurvePolygon?crs=" + map_srid, "{}_Final_Approach_Surfaces".format(navaid_type), "memory")
+    else:
+        v_layer = QgsVectorLayer("PolygonZ?crs=" + map_srid, "{}_Final_Approach_Surfaces".format(navaid_type), "memory")
+    
     provider = v_layer.dataProvider()
     
+
+
+    'Curved Features'
     # Add fields
     provider.addAttributes([
         QgsField('{}_Final_Approach_Surface'.format(navaid_type), QVariant.String)
@@ -223,7 +253,7 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
     if navaid_type == "LOC":
         draw_loc()
     elif navaid_type == "DF":
-        draw_df()
+        draw_df(provider,log ,track_azimuth,length,thr_elev,navaid_geom,thr_geom)
     elif navaid_type == "PSR":
         draw_sre()
     elif navaid_type == "NDB" or navaid_type == "VOR":
@@ -232,8 +262,6 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
         iface.messageBar().pushMessage("Error", "Navaid Type selection is invalid", level=Qgis.Critical)
 
 
-
-    ##TODO: Check and update below
     # Update layer extents
     v_layer.updateExtents()
     
