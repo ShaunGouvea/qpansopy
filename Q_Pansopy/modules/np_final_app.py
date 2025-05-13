@@ -36,13 +36,15 @@ def draw_vor_ndb(provider: QgsVectorLayer,azimuth:float,thr_geom,thr_elev:QPANSO
     else:
         raise TypeError("Invalid NAVAID Type")
     
+    och = QPANSOPYUnit(250,QPANSOPYUnitType.FEET)
+    moc = QPANSOPYUnit(75,QPANSOPYUnitType.METRE)
     end_geom = navaid_geom.project(length.metres,azimuth)
     secondary_width_start = area_tolerance.metres
     secondary_width_end = area_tolerance.metres + length.metres*math.tan(area_splay.radians)
     primary_width_start = area_tolerance.metres / 2
     primary_width_end = secondary_width_end / 2
-    primary_area_altitude_m = thr_elev.metres + 75
-    secondary_area_altitude_m = thr_elev.metres + 75 + 30
+    primary_area_altitude_m = thr_elev.metres + och.metres - moc.metres
+    secondary_area_altitude_m = thr_elev.metres + och.metres
 
     # Calculate surface points
     #   Primary Area
