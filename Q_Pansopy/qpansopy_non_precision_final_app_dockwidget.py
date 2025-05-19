@@ -38,6 +38,7 @@ class QPANSOPYNpFinAppDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.calculateInterceptpushButton.clicked.connect(self.populate_track_offset)
         self.calculateButton.clicked.connect(self.calculate)
         self.browseButton.clicked.connect(self.browse_output_folder)
+        self.navaidTypeComboBox.currentIndexChanged.connect(self.update_fields)
         
         # Set default output folder
         self.outputFolderLineEdit.setText(self.get_desktop_path())
@@ -54,6 +55,7 @@ class QPANSOPYNpFinAppDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.distanceUnitsComboBox.addItems([QPANSOPYUnit._abbreviation[QPANSOPYUnitType.NAUTICAL_MILE],QPANSOPYUnit._abbreviation[QPANSOPYUnitType.METRE]])
 
         self.segmentLengthSpinBox.setValue(5.0)
+        self.update_fields()
 
         # Log message
         self.log("QPANSOPY Non-precision Final Approach plugin loaded. Select layers and parameters, then click Calculate.")
@@ -148,6 +150,48 @@ class QPANSOPYNpFinAppDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.trackOffsetUnitsComboBox.setCurrentText(QPANSOPYUnit._abbreviation[QPANSOPYUnitType.DEGREES])
 
 
+    def update_fields(self):
+        """changes what fields / selection boxes are available for selection depending on which facility type is selected"""
+        navaid_type:str = self.navaidTypeComboBox.currentText()
+        if navaid_type == "NDB" or navaid_type == "VOR":
+            self.trackOffsetSpinBox.setEnabled(True)
+            self.trackOffsetUnitsComboBox.setEnabled(True)
+            self.drawTrackToleranceCheckBox.setEnabled(True)
+            self.directionFATComboBox.setEnabled(True)
+            self.calculateInterceptpushButton.setEnabled(True)
+            self.loadOASConstantsPushButton.setEnabled(False)
+        elif navaid_type == "TAR":
+            self.trackOffsetSpinBox.setEnabled(False)
+            self.trackOffsetUnitsComboBox.setEnabled(False)
+            self.drawTrackToleranceCheckBox.setEnabled(False)
+            self.directionFATComboBox.setEnabled(False)
+            self.calculateInterceptpushButton.setEnabled(False)
+            self.loadOASConstantsPushButton.setEnabled(False)
+        elif navaid_type == "DF":
+            self.trackOffsetSpinBox.setEnabled(True)
+            self.trackOffsetUnitsComboBox.setEnabled(True)
+            self.drawTrackToleranceCheckBox.setEnabled(False)
+            self.directionFATComboBox.setEnabled(False)
+            self.calculateInterceptpushButton.setEnabled(True)
+            self.loadOASConstantsPushButton.setEnabled(False)
+        elif navaid_type == "LOC":
+            self.trackOffsetSpinBox.setEnabled(True)
+            self.trackOffsetUnitsComboBox.setEnabled(True)
+            self.drawTrackToleranceCheckBox.setEnabled(True)
+            self.directionFATComboBox.setEnabled(False)
+            self.calculateInterceptpushButton.setEnabled(True)
+            self.loadOASConstantsPushButton.setEnabled(True)
+        else:
+            #Disable all
+            self.trackOffsetSpinBox.setEnabled(False)
+            self.trackOffsetUnitsComboBox.setEnabled(False)
+            self.drawTrackToleranceCheckBox.setEnabled(False)
+            self.directionFATComboBox.setEnabled(False)
+            self.calculateInterceptpushButton.setEnabled(False)
+            self.loadOASConstantsPushButton.setEnabled(False)
+
+
+
     def calculate(self):
         """Run the calculation"""
 
@@ -221,15 +265,13 @@ class QPANSOPYNpFinAppDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         
         try:
             # Run calculation based on Navaid type
-            if navaid_type == "NDB" or navaid_type == "VOR" or navaid_type == "DF":
+            if navaid_type == "NDB" or navaid_type == "VOR" or navaid_type == "DF" or navaid_type == "TAR":
                 self.log("Running {} splay calculation...".format(navaid_type))
                 # Import here to avoid circular imports
                 from .modules.np_final_app import calculate_np_final_approach
                 result = calculate_np_final_approach(self.iface, thr_layer,navaid_layer, runway_layer, params,self.log)
             elif navaid_type == "LOC":
                 iface.messageBar().pushMessage("Error", "LOC not yet implimented", level=Qgis.Critical)
-            elif navaid_type == "PSR":
-                iface.messageBar().pushMessage("Error", "PSR not yet implimented", level=Qgis.Critical)
             else:
                 raise TypeError("Invalid Navaid Type Selection: ",navaid_type)
             

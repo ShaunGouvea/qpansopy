@@ -18,7 +18,6 @@ class QPANSOPYUnitType(Flag):
     ##Ignores the following variables as they are not integers. they will be populated as dictionaries outside of this class
     _ignore_ = ["_unit_category","_category_lookup"]
 
-    ##TODO: Check all spelling
     NAUTICAL_MILE = NAUTICAL_MILES = auto()
     STATUTE_MILE = STATUTE_MILES = MILE = MILES = auto()
     METRE = METRES = auto()

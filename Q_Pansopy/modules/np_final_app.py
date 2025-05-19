@@ -100,7 +100,8 @@ def draw_df(provider,log ,azimuth,length:QPANSOPYUnit,thr_elev:QPANSOPYUnit,nava
     och = QPANSOPYUnit(250,QPANSOPYUnitType.FEET)
     moc = QPANSOPYUnit(90,QPANSOPYUnitType.METRE)
     primary_alt = och.metres - moc.metres + thr_elev.metres
-    splay_line_length = (area_tolerance.metres / 2) * math.cos(inverse_splay.radians) + math.sqrt(length.metres**2 - (area_tolerance.metres / 2)**2 * math.sin(inverse_splay.radians)**2)
+    splay_line_length = -(area_tolerance.metres / 2) * math.cos(inverse_splay.radians) + math.sqrt(length.metres**2 - (area_tolerance.metres / 2)**2 * math.sin(inverse_splay.radians)**2)
+    
     pnt_p1 = navaid_geom.project(area_tolerance.metres / 2,azimuth +90)
     pnt_p2 = navaid_geom.project(area_tolerance.metres / 2,azimuth -90)
     pnt_p3 = pnt_p1.project(splay_line_length,azimuth +10)
@@ -122,8 +123,33 @@ def draw_df(provider,log ,azimuth,length:QPANSOPYUnit,thr_elev:QPANSOPYUnit,nava
     provider.addFeatures([feature])
 
 
-def draw_sre():
-    pass
+def draw_sre(provider:QgsVectorLayer,navaid_geom:QgsPoint,thr_geom:QgsPoint,thr_elev:float,length:QPANSOPYUnit,azimuth:float,log=None):
+    #TODO: consider Fix tolerance for the TAR in there
+    och = QPANSOPYUnit(250,QPANSOPYUnitType.FEET)
+    moc = QPANSOPYUnit(75,QPANSOPYUnitType.METRE)
+    primary_area_altitude_m = thr_elev.metres + och.metres - moc.metres
+    pnt_mapt = thr_geom.project(3704,azimuth)
+    pnt_end = thr_geom.project(length.metres,azimuth)
+    distance_mapt = navaid_geom.distance(pnt_mapt)
+    distance_end = navaid_geom.distance(pnt_end)
+    mapt_width = (0.1 * distance_mapt) + 1900
+    faf_width = (0.1 * distance_end) + 1900
+    pnt_p1 = pnt_mapt.project(mapt_width,azimuth+90)
+    pnt_p2 = pnt_mapt.project(mapt_width,azimuth-90)
+    pnt_p3 = pnt_end.project(faf_width,azimuth+90)
+    pnt_p4 = pnt_end.project(faf_width,azimuth-90)
+    exterior_ring = [pz(pnt_p1, primary_area_altitude_m), pz(pnt_p2, primary_area_altitude_m), pz(pnt_p4, primary_area_altitude_m), pz(pnt_p3, primary_area_altitude_m)]
+    feature = QgsFeature()
+    feature.setGeometry(QgsPolygon(QgsLineString(exterior_ring)))
+    feature.setAttributes(['primary area'])
+    provider.addFeatures([feature])
+    #Nominal Track
+    line = [pz(pnt_mapt,thr_elev.metres),pz(pnt_end,thr_elev.metres)]
+    feature = QgsFeature()
+    feature.setGeometry(QgsPolygon(QgsLineString(line)))
+    feature.setAttributes(['Nominal Track'])
+    provider.addFeatures([feature])
+
 
 def draw_track_tolerance(provider:QgsVectorLayer,tolerance_angle:QPANSOPYUnit,navaid_geom,length:QPANSOPYUnit,azimuth:float):
 
@@ -213,7 +239,14 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
     runway_azimuth = angle0 + s2
     runway_back_azimuth = (runway_azimuth + 180) % 360
     point_of_intersect = thr_geom.project(1400,runway_back_azimuth)
+    end_of_gate_1 = point_of_intersect.project(150,runway_azimuth-90)
+    end_of_gate_2 = point_of_intersect.project(150,runway_azimuth+90)
     largest_offset = navaid_geom.azimuth(point_of_intersect) % 360
+
+
+    min_offset_1 = navaid_geom.azimuth(end_of_gate_1) % 360
+    min_offset_2 = navaid_geom.azimuth(end_of_gate_2) % 360
+
     
     max_offset = largest_offset - runway_back_azimuth
     if max_offset < 0:
@@ -221,7 +254,15 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
     else:
         direction = "Left of centreline"
     log(f"Maximum offset angle for this approach is: {abs(math.floor(max_offset*10000)/10000)}° {direction}")
-    
+
+    min_offset = min(min_offset_1,min_offset_2) - runway_back_azimuth
+    if min_offset < 0:
+        direction = "Right of centreline"
+    else:
+        direction = "Left of centreline"
+    log(f"Minimum offset angle for this approach is: {abs(math.floor(min_offset*10000)/10000)}° {direction}")
+
+
     ##Calculate the direction to draw the final approach track
     if FAT_direction.startswith("TO") or navaid_type == "DF":
         track_azimuth = (runway_back_azimuth + offset_angle.degrees) % 360
@@ -254,8 +295,8 @@ def calculate_np_final_approach(iface, threshold_layer,naviad_layer, runway_laye
         draw_loc()
     elif navaid_type == "DF":
         draw_df(provider,log ,track_azimuth,length,thr_elev,navaid_geom,thr_geom)
-    elif navaid_type == "PSR":
-        draw_sre()
+    elif navaid_type == "TAR":
+        draw_sre(provider,navaid_geom,thr_geom,thr_elev,length,runway_back_azimuth,log)
     elif navaid_type == "NDB" or navaid_type == "VOR":
         draw_vor_ndb(provider,track_azimuth,thr_geom,thr_elev, navaid_geom,navaid_type,length,log,construct_trk_tol)
     else:
@@ -378,6 +419,7 @@ def calculate_offset(naviad,threshold,runway,direction:str) -> float:
             largest_offset = (navaid_geom.azimuth(point_of_intersect)+180) % 360
         else:
             raise TypeError("Direction is not valid string")
+        
         
         return largest_offset - runway_back_azimuth
 
