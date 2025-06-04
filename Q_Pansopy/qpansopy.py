@@ -8,17 +8,18 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMenu, QToolBar, QMessageBox
 from qgis.core import QgsProject, QgsVectorLayer, QgsFeature, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsApplication
 
-
 # Importar los dock widgets con manejo de errores
 try:
     from .qpansopy_vss_dockwidget import QPANSOPYVSSDockWidget
     from .qpansopy_ils_dockwidget import QPANSOPYILSDockWidget
     from .qpansopy_wind_spiral_dockwidget import QPANSOPYWindSpiralDockWidget
     from .qpansopy_oas_ils_dockwidget import QPANSOPYOASILSDockWidget
+    from .qpansopy_non_precision_final_app_dockwidget import QPANSOPYNpFinAppDockWidget
     from .settings_dialog import SettingsDialog  # Importar el diálogo de configuración
 except ImportError as e:
     # No lanzamos el error aquí, lo manejaremos en initGui
     pass
+
 
 class Qpansopy:
     """QPANSOPY Plugin Implementation"""
@@ -66,6 +67,7 @@ class Qpansopy:
         }
 
 
+
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
         try:
@@ -78,7 +80,8 @@ class Qpansopy:
             self.modules:dict = {"VSS": {"TITLE":"QPANSOPY VSS Tool","TOOLBAR":"UTILITIES","TOOLTIP":"Visual Segment Surface Tool - Analyze obstacle clearance for visual segments","ICON":"vss_icon.png","DOCK_WIDGET": QPANSOPYVSSDockWidget,"GUI_INSTANCE":None},
                                 "ILS_BASIC": {"TITLE":"QPANSOPY ILS Tool","TOOLBAR":"ILS","TOOLTIP":"ILS Basic Surface Tool","ICON":"ils_icon.png","DOCK_WIDGET": QPANSOPYILSDockWidget,"GUI_INSTANCE":None},
                                 "WindSpiral": {"TITLE":"QPANSOPY Wind Spiral Tool","TOOLBAR":"UTILITIES","TOOLTIP":"Wind Spiral Tool - Calculate and visualize wind spirals for procedure design","ICON":"wind_spiral.png","DOCK_WIDGET": QPANSOPYWindSpiralDockWidget,"GUI_INSTANCE":None},
-                                "ILS_OAS": {"TITLE":"QPANSOPY OAS ILS Tool","TOOLBAR":"ILS","TOOLTIP":"Visual Segment Surface Tool - Analyze obstacle clearance for visual segments","ICON":"oas_ils.png","DOCK_WIDGET": QPANSOPYOASILSDockWidget,"GUI_INSTANCE":None}}
+                                "ILS_OAS": {"TITLE":"QPANSOPY OAS ILS Tool","TOOLBAR":"ILS","TOOLTIP":"Visual Segment Surface Tool - Analyze obstacle clearance for visual segments","ICON":"oas_ils.png","DOCK_WIDGET": QPANSOPYOASILSDockWidget,"GUI_INSTANCE":None},
+                                "NPFA": {"TITLE":"QPANSOPY Non-precision Final App Tool","TOOLBAR":"CONC","TOOLTIP":"Non-precision Final Approach Tool - Contruction of Final Approach segment using conventional criteria","ICON":"NP_FinalApp_icon.png","DOCK_WIDGET": QPANSOPYNpFinAppDockWidget,"GUI_INSTANCE":None}}
             
             ##If you do not want empty submenus to be displayed self.submenus can be left as an empty dictionary
             #self.submenus:dict = {}
@@ -184,7 +187,7 @@ class Qpansopy:
                 self.iface.removeDockWidget(properties["GUI_INSTANCE"])
                 self.modules[name]["GUI_INSTANCE"] = None
 
-
+            
     def toggle_dock(self,name:str):
         """Toggle the requested dock widget
         :param str name: key name from self.module for the module to toggle 
@@ -193,6 +196,7 @@ class Qpansopy:
             dock_widget = self.modules[name]["DOCK_WIDGET"]
              # Create the dock widget
             module_dock = self.modules[name]["GUI_INSTANCE"] = dock_widget(self.iface)
+
             # Aplicar configuración
             try:
                 module_dock.exportKmlCheckBox.setChecked(self.settings.value("qpansopy/enable_kml", False, type=bool))
@@ -200,7 +204,7 @@ class Qpansopy:
                 QMessageBox.warning(self.iface.mainWindow(), "QPANSOPY Error","This Widget has no KML Export Button")
             if hasattr(module_dock, "logTextEdit"):
                 module_dock.logTextEdit.setVisible(self.settings.value("qpansopy/show_log", True, type=bool))
-            
+
             # Connect the closing signal
             module_dock.closingPlugin.connect(lambda _,n=name: self.on_dock_closed(n))
             # Add the dock widget to the interface
